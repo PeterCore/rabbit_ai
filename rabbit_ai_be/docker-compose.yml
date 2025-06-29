@@ -22,6 +22,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: rabbit_ai_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - rabbit_ai_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
   # Rabbit AI 应用
   app:
     build: .
@@ -37,6 +54,10 @@ services:
       - DB_PASSWORD=password
       - DB_NAME=rabbit_ai
       - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
       - JWT_SECRET=your-secret-key-here-change-in-production
       - JWT_EXPIRE_HOURS=24
       - ALIYUN_ACCESS_KEY_ID=your-access-key-id
@@ -45,6 +66,8 @@ services:
       - ALIYUN_ONE_CLICK_APP_ID=your-one-click-app-id
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - rabbit_ai_network
@@ -66,6 +89,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   rabbit_ai_network:

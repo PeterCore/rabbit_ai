@@ -1,6 +1,6 @@
 # Rabbit AI 登录注册系统
 
-一个基于 Golang + Gin 框架的 AI 应用登录注册系统，支持阿里一键登录、JWT 认证和 PostgreSQL 数据库。
+一个基于 Golang + Gin 框架的 AI 应用登录注册系统，支持阿里一键登录、JWT 认证、PostgreSQL 数据库和 Redis 缓存。
 
 ## 功能特性
 
@@ -8,6 +8,7 @@
 - 🛡️ **JWT 认证**: 使用 JWT 进行用户身份验证和授权
 - 👤 **用户管理**: 完整的用户 CRUD 操作
 - 🗄️ **PostgreSQL**: 使用 PostgreSQL 作为主数据库
+- ⚡ **Redis 缓存**: 使用 Redis 缓存用户信息，提升查询性能
 - 🏗️ **分层架构**: 清晰的分层架构设计，易于维护和扩展
 - 📚 **完整文档**: 提供详细的 API 文档和使用说明
 
@@ -16,6 +17,7 @@
 - **后端框架**: Gin
 - **认证**: JWT (github.com/dgrijalva/jwt-go)
 - **数据库**: PostgreSQL
+- **缓存**: Redis (github.com/redis/go-redis/v9)
 - **配置管理**: 环境变量 + godotenv
 - **API 文档**: Markdown 格式
 
@@ -35,8 +37,13 @@ rabbit_ai/
 │   │   └── service.go           # 用户服务
 │   ├── middleware/
 │   │   └── jwt.go               # JWT 中间件
-│   └── model/
-│       └── user.go              # 用户模型
+│   ├── model/
+│   │   └── user.go              # 用户模型
+│   ├── cache/
+│   │   ├── redis.go             # Redis 缓存服务
+│   │   └── redis_test.go        # Redis 缓存测试
+│   └── repository/
+│       └── user_cache.go        # 带缓存的用户仓库
 ├── config/
 │   └── config.yaml              # 配置文件
 ├── scripts/
@@ -55,6 +62,7 @@ rabbit_ai/
 
 - Go 1.21+
 - PostgreSQL 12+
+- Redis 6+
 - 阿里云账号（用于一键登录服务）
 
 ### 2. 克隆项目
@@ -91,6 +99,12 @@ DB_PASSWORD=your_password
 DB_NAME=rabbit_ai
 DB_SSLMODE=disable
 
+# Redis 配置
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
 # JWT 配置
 JWT_SECRET=your-secret-key-here
 JWT_EXPIRE_HOURS=24
@@ -102,35 +116,61 @@ ALIYUN_REGION=cn-hangzhou
 ALIYUN_ONE_CLICK_APP_ID=your-one-click-app-id
 ```
 
-### 5. 初始化数据库
+### 5. 启动服务
+
+#### 使用 Docker Compose（推荐）
 
 ```bash
-# 创建数据库和表
+# 启动所有服务（PostgreSQL + Redis + 应用）
+docker-compose up -d
+
+# 查看服务状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f app
+```
+
+#### 手动启动
+
+```bash
+# 启动 PostgreSQL
+# 根据你的系统安装和启动 PostgreSQL
+
+# 启动 Redis
+redis-server
+
+# 初始化数据库
 make init-db
-# 或者手动执行
-psql -U postgres -f scripts/init_db.sql
-```
 
-### 6. 运行项目
-
-```bash
-# 开发模式运行
+# 运行应用
 make run
-# 或者
-go run cmd/server/main.go
-
-# 构建并运行
-make build
-./bin/server
 ```
 
-### 7. 验证服务
+### 6. 验证服务
 
 访问健康检查接口：
 
 ```bash
 curl http://localhost:8080/health
 ```
+
+## 缓存功能
+
+### Redis 缓存特性
+
+- **用户信息缓存**: 用户信息缓存30分钟，提升查询性能
+- **缓存策略**: 采用 Cache-Aside 模式，先查缓存，缓存未命中则查数据库
+- **数据同步**: 确保缓存与数据库数据一致性
+- **自动失效**: 用户信息更新时自动使缓存失效
+
+### 缓存操作
+
+- **读取**: 优先从 Redis 缓存获取，缓存未命中则从数据库获取并缓存
+- **写入**: 先写入数据库，再更新缓存
+- **更新**: 先更新数据库，再更新缓存
+- **删除**: 先删除数据库记录，再删除缓存
+- **密码更新**: 密码更新时使缓存失效（安全考虑）
 
 ## API 使用
 
@@ -177,7 +217,11 @@ make lint
 ### 运行测试
 
 ```bash
+# 运行所有测试
 make test
+
+# 运行缓存测试（需要 Redis 运行）
+go test ./internal/cache/
 ```
 
 ### 热重载开发
@@ -226,6 +270,13 @@ CMD ["./server"]
 - `DB_NAME`: 数据库名称
 - `DB_SSLMODE`: SSL 模式
 
+### Redis 配置
+
+- `REDIS_HOST`: Redis 主机地址
+- `REDIS_PORT`: Redis 端口
+- `REDIS_PASSWORD`: Redis 密码（可选）
+- `REDIS_DB`: Redis 数据库编号
+
 ### JWT 配置
 
 - `JWT_SECRET`: JWT 签名密钥
@@ -242,8 +293,10 @@ CMD ["./server"]
 
 1. **阿里云配置**: 需要先在阿里云控制台开通一键登录服务并获取相关配置
 2. **数据库安全**: 生产环境中请使用强密码和 SSL 连接
-3. **JWT 密钥**: 生产环境中请使用足够复杂的密钥
-4. **环境变量**: 敏感信息请通过环境变量配置，不要硬编码
+3. **Redis 安全**: 生产环境中请设置 Redis 密码和访问控制
+4. **JWT 密钥**: 生产环境中请使用足够复杂的密钥
+5. **环境变量**: 敏感信息请通过环境变量配置，不要硬编码
+6. **缓存一致性**: 确保缓存与数据库的数据一致性，避免数据不一致问题
 
 ## 贡献
 

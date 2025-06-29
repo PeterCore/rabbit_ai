@@ -10,6 +10,14 @@ database:
   dbname: rabbit_ai
   sslmode: disable
 
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+  min_idle_conns: 5
+
 jwt:
   secret: your-secret-key-here
   expire_hours: 24

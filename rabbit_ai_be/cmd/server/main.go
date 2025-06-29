@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -12,8 +13,10 @@ import (
 	_ "github.com/lib/pq"
 
 	"rabbit_ai/internal/auth"
+	"rabbit_ai/internal/cache"
 	"rabbit_ai/internal/middleware"
 	"rabbit_ai/internal/model"
+	"rabbit_ai/internal/repository"
 	"rabbit_ai/internal/user"
 )
 
@@ -31,6 +34,14 @@ type Config struct {
 		DBName   string `yaml:"dbname"`
 		SSLMode  string `yaml:"sslmode"`
 	} `yaml:"database"`
+	Redis struct {
+		Host         string `yaml:"host"`
+		Port         int    `yaml:"port"`
+		Password     string `yaml:"password"`
+		DB           int    `yaml:"db"`
+		PoolSize     int    `yaml:"pool_size"`
+		MinIdleConns int    `yaml:"min_idle_conns"`
+	} `yaml:"redis"`
 	JWT struct {
 		Secret      string `yaml:"secret"`
 		ExpireHours int    `yaml:"expire_hours"`
@@ -67,8 +78,29 @@ func main() {
 		log.Fatal("Failed to initialize database:", err)
 	}
 
-	// 创建用户仓库
-	userRepo := model.NewUserRepository(db)
+	// 连接Redis
+	redisCache, err := connectRedis(config)
+	if err != nil {
+		log.Fatal("Failed to connect to Redis:", err)
+	}
+	defer redisCache.Close()
+
+	// 测试Redis连接
+	ctx := context.Background()
+	if err := redisCache.Ping(ctx); err != nil {
+		log.Printf("Warning: Redis ping failed: %v", err)
+	} else {
+		log.Println("Redis connection established successfully")
+	}
+
+	// 创建基础用户仓库
+	baseUserRepo := model.NewUserRepository(db)
+
+	// 创建带缓存的用户仓库
+	userRepo := repository.NewCachedUserRepository(baseUserRepo, redisCache)
+
+	// 创建缓存管理器
+	cacheManager := cache.NewCacheManager(redisCache)
 
 	// 创建JWT配置
 	jwtConfig := middleware.JWTConfig{
@@ -91,6 +123,7 @@ func main() {
 	// 创建处理器
 	authHandler := auth.NewHandler(authService)
 	userHandler := user.NewHandler(userService)
+	cacheHandler := cache.NewHandler(cacheManager)
 
 	// 创建路由
 	r := gin.Default()
@@ -118,6 +151,7 @@ func main() {
 		protected.Use(middleware.JWTMiddleware(jwtConfig))
 		{
 			userHandler.RegisterRoutes(protected)
+			cacheHandler.RegisterRoutes(protected)
 		}
 	}
 
@@ -147,6 +181,14 @@ func loadConfig() *Config {
 	config.Database.Password = getEnv("DB_PASSWORD", "password")
 	config.Database.DBName = getEnv("DB_NAME", "rabbit_ai")
 	config.Database.SSLMode = getEnv("DB_SSLMODE", "disable")
+
+	// Redis配置
+	config.Redis.Host = getEnv("REDIS_HOST", "localhost")
+	config.Redis.Port = 6379
+	config.Redis.Password = getEnv("REDIS_PASSWORD", "")
+	config.Redis.DB = 0
+	config.Redis.PoolSize = 10
+	config.Redis.MinIdleConns = 5
 
 	config.JWT.Secret = getEnv("JWT_SECRET", "your-secret-key-here")
 	config.JWT.ExpireHours = 24
@@ -194,6 +236,21 @@ func connectDatabase(config *Config) (*sql.DB, error) {
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	return db, nil
+}
+
+// connectRedis 连接Redis
+func connectRedis(config *Config) (*cache.RedisCache, error) {
+	addr := fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port)
+
+	redisCache := cache.NewRedisCache(addr, config.Redis.Password, config.Redis.DB)
+
+	// 测试连接
+	ctx := context.Background()
+	if err := redisCache.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ping Redis: %w", err)
+	}
+
+	return redisCache, nil
 }
 
 // initDatabase 初始化数据库表
