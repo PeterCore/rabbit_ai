@@ -1,0 +1,21 @@
+server:
+  port: 8080
+  mode: debug
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: password
+  dbname: rabbit_ai
+  sslmode: disable
+
+jwt:
+  secret: your-secret-key-here
+  expire_hours: 24
+
+aliyun:
+  access_key_id: your-access-key-id
+  access_key_secret: your-access-key-secret
+  region: cn-hangzhou
+  one_click_app_id: your-one-click-app-id

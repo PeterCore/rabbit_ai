@@ -1,0 +1,215 @@
+package model
+
+import (
+	"database/sql"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+)
+
+// User 用户模型
+type User struct {
+	ID        int64     `json:"id" db:"id"`
+	Phone     string    `json:"phone" db:"phone"`
+	Password  string    `json:"-" db:"password"` // 密码不返回给前端
+	Nickname  string    `json:"nickname" db:"nickname"`
+	Avatar    string    `json:"avatar" db:"avatar"`
+	Status    int       `json:"status" db:"status"` // 1: 正常, 0: 禁用
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// UserRepository 用户数据访问接口
+type UserRepository interface {
+	Create(user *User) error
+	GetByID(id int64) (*User, error)
+	GetByPhone(phone string) (*User, error)
+	Update(user *User) error
+	Delete(id int64) error
+	CreateWithPassword(user *User, password string) error
+	VerifyPassword(phone, password string) (*User, error)
+	UpdatePassword(userID int64, newPassword string) error
+}
+
+// UserRepositoryImpl 用户数据访问实现
+type UserRepositoryImpl struct {
+	db *sql.DB
+}
+
+// NewUserRepository 创建用户仓库实例
+func NewUserRepository(db *sql.DB) UserRepository {
+	return &UserRepositoryImpl{db: db}
+}
+
+// Create 创建用户
+func (r *UserRepositoryImpl) Create(user *User) error {
+	query := `
+		INSERT INTO users (phone, nickname, avatar, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id`
+
+	now := time.Now()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+
+	return r.db.QueryRow(
+		query,
+		user.Phone,
+		user.Nickname,
+		user.Avatar,
+		user.Status,
+		user.CreatedAt,
+		user.UpdatedAt,
+	).Scan(&user.ID)
+}
+
+// CreateWithPassword 创建带密码的用户
+func (r *UserRepositoryImpl) CreateWithPassword(user *User, password string) error {
+	// 加密密码
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	query := `
+		INSERT INTO users (phone, password, nickname, avatar, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id`
+
+	now := time.Now()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+
+	return r.db.QueryRow(
+		query,
+		user.Phone,
+		string(hashedPassword),
+		user.Nickname,
+		user.Avatar,
+		user.Status,
+		user.CreatedAt,
+		user.UpdatedAt,
+	).Scan(&user.ID)
+}
+
+// GetByID 根据ID获取用户
+func (r *UserRepositoryImpl) GetByID(id int64) (*User, error) {
+	user := &User{}
+	query := `
+		SELECT id, phone, password, nickname, avatar, status, created_at, updated_at
+		FROM users WHERE id = $1`
+
+	err := r.db.QueryRow(query, id).Scan(
+		&user.ID,
+		&user.Phone,
+		&user.Password,
+		&user.Nickname,
+		&user.Avatar,
+		&user.Status,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// GetByPhone 根据手机号获取用户
+func (r *UserRepositoryImpl) GetByPhone(phone string) (*User, error) {
+	user := &User{}
+	query := `
+		SELECT id, phone, password, nickname, avatar, status, created_at, updated_at
+		FROM users WHERE phone = $1`
+
+	err := r.db.QueryRow(query, phone).Scan(
+		&user.ID,
+		&user.Phone,
+		&user.Password,
+		&user.Nickname,
+		&user.Avatar,
+		&user.Status,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// VerifyPassword 验证密码
+func (r *UserRepositoryImpl) VerifyPassword(phone, password string) (*User, error) {
+	user, err := r.GetByPhone(phone)
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查用户是否有密码
+	if user.Password == "" {
+		return nil, sql.ErrNoRows
+	}
+
+	// 验证密码
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// Update 更新用户信息
+func (r *UserRepositoryImpl) Update(user *User) error {
+	query := `
+		UPDATE users 
+		SET nickname = $1, avatar = $2, status = $3, updated_at = $4
+		WHERE id = $5`
+
+	user.UpdatedAt = time.Now()
+
+	_, err := r.db.Exec(
+		query,
+		user.Nickname,
+		user.Avatar,
+		user.Status,
+		user.UpdatedAt,
+		user.ID,
+	)
+
+	return err
+}
+
+// UpdatePassword 更新密码
+func (r *UserRepositoryImpl) UpdatePassword(userID int64, newPassword string) error {
+	// 加密新密码
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	query := `
+		UPDATE users 
+		SET password = $1, updated_at = $2
+		WHERE id = $3`
+
+	_, err = r.db.Exec(
+		query,
+		string(hashedPassword),
+		time.Now(),
+		userID,
+	)
+
+	return err
+}
+
+// Delete 删除用户
+func (r *UserRepositoryImpl) Delete(id int64) error {
+	query := `DELETE FROM users WHERE id = $1`
+	_, err := r.db.Exec(query, id)
+	return err
+}

@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: rabbit_ai_postgres
+    environment:
+      POSTGRES_DB: rabbit_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    networks:
+      - rabbit_ai_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Rabbit AI 应用
+  app:
+    build: .
+    container_name: rabbit_ai_app
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_MODE=release
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=rabbit_ai
+      - DB_SSLMODE=disable
+      - JWT_SECRET=your-secret-key-here-change-in-production
+      - JWT_EXPIRE_HOURS=24
+      - ALIYUN_ACCESS_KEY_ID=your-access-key-id
+      - ALIYUN_ACCESS_KEY_SECRET=your-access-key-secret
+      - ALIYUN_REGION=cn-hangzhou
+      - ALIYUN_ONE_CLICK_APP_ID=your-one-click-app-id
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rabbit_ai_network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+
+networks:
+  rabbit_ai_network:
+    driver: bridge
