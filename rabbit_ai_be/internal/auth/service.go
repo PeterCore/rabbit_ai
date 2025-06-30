@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,14 +25,16 @@ type AuthService struct {
 	userRepo     model.UserRepository
 	jwtConfig    middleware.JWTConfig
 	aliyunConfig AliyunConfig
+	githubOAuth  *GitHubOAuth
 }
 
 // NewAuthService 创建认证服务实例
-func NewAuthService(userRepo model.UserRepository, jwtConfig middleware.JWTConfig, aliyunConfig AliyunConfig) *AuthService {
+func NewAuthService(userRepo model.UserRepository, jwtConfig middleware.JWTConfig, aliyunConfig AliyunConfig, githubOAuth *GitHubOAuth) *AuthService {
 	return &AuthService{
 		userRepo:     userRepo,
 		jwtConfig:    jwtConfig,
 		aliyunConfig: aliyunConfig,
+		githubOAuth:  githubOAuth,
 	}
 }
 
@@ -57,6 +60,12 @@ type RegisterRequest struct {
 type LoginResponse struct {
 	Token string      `json:"token"`
 	User  *model.User `json:"user"`
+}
+
+// GitHubLoginRequest GitHub登录请求
+type GitHubLoginRequest struct {
+	Code  string `json:"code" binding:"required"`
+	State string `json:"state"`
 }
 
 // Login 用户登录（阿里一键登录）
@@ -202,3 +211,67 @@ func (s *AuthService) getPhoneFromAliyun(authCode string) (string, error) {
 
 // 注意：实际项目中，阿里云API调用需要正确的签名算法
 // 这里提供的是简化版本，实际使用时需要参考阿里云官方SDK或文档
+
+// GitHubLogin GitHub登录
+func (s *AuthService) GitHubLogin(code, state string) (*LoginResponse, error) {
+	ctx := context.Background()
+
+	// 1. 使用授权码交换访问令牌
+	token, err := s.githubOAuth.ExchangeCode(ctx, code)
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
+	}
+
+	// 2. 获取GitHub用户信息
+	githubUser, err := s.githubOAuth.GetUserInfo(ctx, token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GitHub user info: %w", err)
+	}
+
+	// 3. 查找或创建用户
+	user, err := s.userRepo.GetByGitHubID(fmt.Sprintf("%d", githubUser.ID))
+	if err != nil {
+		// 用户不存在，创建新用户
+		nickname := githubUser.Name
+		if nickname == "" {
+			nickname = githubUser.Login
+		}
+
+		user = &model.User{
+			GitHubID: fmt.Sprintf("%d", githubUser.ID),
+			Email:    githubUser.Email,
+			Nickname: nickname,
+			Avatar:   githubUser.AvatarURL,
+			Status:   1, // 正常状态
+		}
+
+		err = s.userRepo.Create(user)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create user: %w", err)
+		}
+	} else {
+		// 用户存在，更新信息
+		user.Nickname = githubUser.Name
+		if user.Nickname == "" {
+			user.Nickname = githubUser.Login
+		}
+		user.Avatar = githubUser.AvatarURL
+		user.Email = githubUser.Email
+
+		err = s.userRepo.Update(user)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update user: %w", err)
+		}
+	}
+
+	// 4. 生成 JWT token
+	jwtToken, err := middleware.GenerateToken(user.ID, s.jwtConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	return &LoginResponse{
+		Token: jwtToken,
+		User:  user,
+	}, nil
+}

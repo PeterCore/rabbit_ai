@@ -102,12 +102,60 @@ func (h *Handler) Register(c *gin.Context) {
 	})
 }
 
+// GitHubLogin GitHub登录
+func (h *Handler) GitHubLogin(c *gin.Context) {
+	var req GitHubLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "Invalid request parameters: " + err.Error(),
+		})
+		return
+	}
+
+	// 调用认证服务
+	response, err := h.authService.GitHubLogin(req.Code, req.State)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "GitHub login failed: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "GitHub login successful",
+		"data":    response,
+	})
+}
+
+// GetGitHubAuthURL 获取GitHub授权URL
+func (h *Handler) GetGitHubAuthURL(c *gin.Context) {
+	state := c.Query("state")
+	if state == "" {
+		state = "random_state" // 实际项目中应该生成随机state
+	}
+
+	authURL := h.authService.githubOAuth.GetAuthURL(state)
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "GitHub auth URL generated",
+		"data": gin.H{
+			"auth_url": authURL,
+		},
+	})
+}
+
 // RegisterRoutes 注册路由
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	auth := r.Group("/auth")
 	{
-		auth.POST("/login", h.Login)                  // 阿里一键登录
-		auth.POST("/login/password", h.PasswordLogin) // 密码登录
-		auth.POST("/register", h.Register)            // 用户注册
+		auth.POST("/login", h.Login)                     // 阿里一键登录
+		auth.POST("/login/password", h.PasswordLogin)    // 密码登录
+		auth.POST("/register", h.Register)               // 用户注册
+		auth.POST("/github/login", h.GitHubLogin)        // GitHub登录
+		auth.GET("/github/auth-url", h.GetGitHubAuthURL) // 获取GitHub授权URL
 	}
 }

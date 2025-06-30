@@ -5,6 +5,7 @@
 ## 功能特性
 
 - 🔐 **阿里一键登录**: 集成阿里云一键登录服务，用户可通过手机号快速登录
+- 🐙 **GitHub登录**: 集成GitHub OAuth，用户可通过GitHub账号快速登录
 - 🛡️ **JWT 认证**: 使用 JWT 进行用户身份验证和授权
 - 👤 **用户管理**: 完整的用户 CRUD 操作
 - 🗄️ **PostgreSQL**: 使用 PostgreSQL 作为主数据库
@@ -64,6 +65,7 @@ rabbit_ai/
 - PostgreSQL 12+
 - Redis 6+
 - 阿里云账号（用于一键登录服务）
+- GitHub账号（用于创建OAuth应用）
 
 ### 2. 克隆项目
 
@@ -114,6 +116,11 @@ ALIYUN_ACCESS_KEY_ID=your-access-key-id
 ALIYUN_ACCESS_KEY_SECRET=your-access-key-secret
 ALIYUN_REGION=cn-hangzhou
 ALIYUN_ONE_CLICK_APP_ID=your-one-click-app-id
+
+# GitHub配置
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GITHUB_REDIRECT_URL=http://localhost:8080/api/v1/auth/github/callback
 ```
 
 ### 5. 启动服务
@@ -288,6 +295,12 @@ CMD ["./server"]
 - `ALIYUN_ACCESS_KEY_SECRET`: 阿里云 Access Key Secret
 - `ALIYUN_REGION`: 阿里云地域
 - `ALIYUN_ONE_CLICK_APP_ID`: 一键登录应用 ID
+
+### GitHub配置
+
+- `GITHUB_CLIENT_ID`: GitHub Client ID
+- `GITHUB_CLIENT_SECRET`: GitHub Client Secret
+- `GITHUB_REDIRECT_URL`: GitHub Redirect URL
 
 ## 注意事项
 

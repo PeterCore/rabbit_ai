@@ -1,6 +1,8 @@
 module rabbit_ai
 
-go 1.21
+go 1.23.0
+
+toolchain go1.24.4
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -33,6 +35,7 @@ require (
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect

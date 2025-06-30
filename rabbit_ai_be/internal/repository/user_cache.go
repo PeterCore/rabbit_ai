@@ -97,6 +97,16 @@ func (r *CachedUserRepository) GetByPhone(phone string) (*model.User, error) {
 	return r.userRepo.GetByPhone(phone)
 }
 
+// GetByGitHubID 根据GitHub ID获取用户（不缓存，因为GitHub ID查询较少）
+func (r *CachedUserRepository) GetByGitHubID(githubID string) (*model.User, error) {
+	return r.userRepo.GetByGitHubID(githubID)
+}
+
+// GetByEmail 根据邮箱获取用户（不缓存，因为邮箱查询较少）
+func (r *CachedUserRepository) GetByEmail(email string) (*model.User, error) {
+	return r.userRepo.GetByEmail(email)
+}
+
 // Update 更新用户信息（同时更新缓存）
 func (r *CachedUserRepository) Update(user *model.User) error {
 	// 先更新数据库

@@ -52,6 +52,11 @@ type Config struct {
 		Region          string `yaml:"region"`
 		OneClickAppID   string `yaml:"one_click_app_id"`
 	} `yaml:"aliyun"`
+	GitHub struct {
+		ClientID     string `yaml:"client_id"`
+		ClientSecret string `yaml:"client_secret"`
+		RedirectURL  string `yaml:"redirect_url"`
+	} `yaml:"github"`
 }
 
 func main() {
@@ -116,8 +121,15 @@ func main() {
 		OneClickAppID:   config.Aliyun.OneClickAppID,
 	}
 
+	// 创建GitHub OAuth配置
+	githubOAuth := auth.NewGitHubOAuth(
+		config.GitHub.ClientID,
+		config.GitHub.ClientSecret,
+		config.GitHub.RedirectURL,
+	)
+
 	// 创建服务
-	authService := auth.NewAuthService(userRepo, jwtConfig, aliyunConfig)
+	authService := auth.NewAuthService(userRepo, jwtConfig, aliyunConfig, githubOAuth)
 	userService := user.NewUserService(userRepo)
 
 	// 创建处理器
@@ -198,6 +210,10 @@ func loadConfig() *Config {
 	config.Aliyun.Region = getEnv("ALIYUN_REGION", "cn-hangzhou")
 	config.Aliyun.OneClickAppID = getEnv("ALIYUN_ONE_CLICK_APP_ID", "")
 
+	config.GitHub.ClientID = getEnv("GITHUB_CLIENT_ID", "")
+	config.GitHub.ClientSecret = getEnv("GITHUB_CLIENT_SECRET", "")
+	config.GitHub.RedirectURL = getEnv("GITHUB_REDIRECT_URL", "")
+
 	return config
 }
 
@@ -258,17 +274,21 @@ func initDatabase(db *sql.DB) error {
 	query := `
 		CREATE TABLE IF NOT EXISTS users (
 			id SERIAL PRIMARY KEY,
-			phone VARCHAR(20) UNIQUE NOT NULL,
+			phone VARCHAR(20) UNIQUE,
 			password VARCHAR(255),
 			nickname VARCHAR(100) NOT NULL,
 			avatar TEXT,
 			status INTEGER DEFAULT 1,
+			github_id VARCHAR(100) UNIQUE,
+			email VARCHAR(255) UNIQUE,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 		
 		CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 		CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+		CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
+		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 	`
 
 	_, err := db.Exec(query)

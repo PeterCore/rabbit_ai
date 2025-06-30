@@ -27,3 +27,8 @@ aliyun:
   access_key_secret: your-access-key-secret
   region: cn-hangzhou
   one_click_app_id: your-one-click-app-id
+
+github:
+  client_id: your-github-client-id
+  client_secret: your-github-client-secret
+  redirect_url: http://localhost:8080/api/v1/auth/github/callback

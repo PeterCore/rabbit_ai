@@ -114,6 +114,62 @@
 }
 ```
 
+### 4. GitHub登录
+
+#### 4.1 获取GitHub授权URL
+
+**接口地址:** `GET /auth/github/auth-url`
+
+**请求参数:**
+```
+state: 可选的状态参数，用于防止CSRF攻击
+```
+
+**响应示例:**
+```json
+{
+  "code": 200,
+  "message": "GitHub auth URL generated",
+  "data": {
+    "auth_url": "https://github.com/login/oauth/authorize?client_id=...&redirect_uri=...&scope=user:email,read:user&state=random_state"
+  }
+}
+```
+
+#### 4.2 GitHub登录回调
+
+**接口地址:** `POST /auth/github/login`
+
+**请求参数:**
+```json
+{
+  "code": "GitHub授权码",
+  "state": "状态参数"
+}
+```
+
+**响应示例:**
+```json
+{
+  "code": 200,
+  "message": "GitHub login successful",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": 1,
+      "phone": "",
+      "nickname": "GitHub用户名",
+      "avatar": "https://avatars.githubusercontent.com/u/123456?v=4",
+      "status": 1,
+      "github_id": "123456",
+      "email": "user@example.com",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  }
+}
+```
+
 ## 用户相关接口（需要认证）
 
 ### 1. 获取用户信息
