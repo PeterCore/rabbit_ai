@@ -2,12 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:rabbit_ai_fe/app/app_dialog_utils.dart';
-
+import 'package:rabbit_ai_fe/common/constants/size_extensions.dart';
+import 'package:rabbit_ai_fe/common/screen_util.dart';
 import '../app/app_color.dart';
 import '../app/app_text_styles.dart';
+import '../common/constants/size_constants.dart';
 
 Future<void> copyToClipboard(String text) async {
   await Clipboard.setData(ClipboardData(text: text));
@@ -47,19 +48,19 @@ void showRichTextDialog(BuildContext context,
             style: AppTextStyles.textWordStyle(
                 txtColor: AppColors.blackColorO6,
                 fontWeight: FontWeight.w500,
-                fontSize: 12.sp)),
+                fontSize: Sizes.dimen_12.sp)),
         TextSpan(
             text: mid,
             style: AppTextStyles.textWordStyle(
                 fontWeight: FontWeight.w500,
                 txtColor: AppColors.pinkColor,
-                fontSize: 12.sp)),
+                fontSize: Sizes.dimen_12.sp)),
         TextSpan(
             text: suffix,
             style: AppTextStyles.textWordStyle(
                 fontWeight: FontWeight.w500,
                 txtColor: AppColors.blackColorO6,
-                fontSize: 12.sp)),
+                fontSize: Sizes.dimen_12.sp)),
       ]),
     ),
     title: "提示",

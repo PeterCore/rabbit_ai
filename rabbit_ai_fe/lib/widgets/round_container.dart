@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:rabbit_ai_fe/common/constants/size_extensions.dart';
 
 import '../app/app_color.dart';
+import '../common/constants/size_constants.dart';
 
 // class RoundDashContainer extends StatelessWidget {
 //   const RoundDashContainer(
@@ -112,12 +113,13 @@ class RoundContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderRadius =
-        customBorderRadius ?? BorderRadius.circular(radius ?? 12.r);
+        customBorderRadius ?? BorderRadius.circular(radius ?? 12);
 
     return imagePath == null
         ? Container(
             padding: EdgeInsets.symmetric(
-                horizontal: horizontal ?? 24.w, vertical: vertical ?? 24.h),
+                horizontal: horizontal ?? Sizes.dimen_24.w,
+                vertical: vertical ?? Sizes.dimen_24.h),
             decoration: BoxDecoration(
               borderRadius: borderRadius,
               color: backgroundColor ?? AppColors.greyF8F8F8,
@@ -143,7 +145,8 @@ class RoundContainer extends StatelessWidget {
           )
         : Container(
             padding: EdgeInsets.symmetric(
-                horizontal: horizontal ?? 24.w, vertical: vertical ?? 24.h),
+                horizontal: horizontal ?? Sizes.dimen_24.w,
+                vertical: vertical ?? Sizes.dimen_24.h),
             decoration: BoxDecoration(
               image: DecorationImage(
                 image: AssetImage(imagePath ?? ""),
