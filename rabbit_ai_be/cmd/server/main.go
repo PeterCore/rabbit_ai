@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	"rabbit_ai/internal/auth"
 	"rabbit_ai/internal/cache"
+	"rabbit_ai/internal/device"
 	"rabbit_ai/internal/middleware"
 	"rabbit_ai/internal/model"
 	"rabbit_ai/internal/repository"
@@ -71,43 +73,27 @@ func main() {
 	// 设置Gin模式
 	gin.SetMode(config.Server.Mode)
 
-	// 连接数据库
+	// 初始化数据库连接
 	db, err := connectDatabase(config)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 	defer db.Close()
 
-	// 初始化数据库表
-	if err := initDatabase(db); err != nil {
-		log.Fatal("Failed to initialize database:", err)
-	}
-
-	// 连接Redis
-	redisCache, err := connectRedis(config)
+	// 初始化Redis连接
+	redisClient, err := connectRedis(config)
 	if err != nil {
 		log.Fatal("Failed to connect to Redis:", err)
 	}
-	defer redisCache.Close()
+	defer redisClient.Close()
 
-	// 测试Redis连接
-	ctx := context.Background()
-	if err := redisCache.Ping(ctx); err != nil {
-		log.Printf("Warning: Redis ping failed: %v", err)
-	} else {
-		log.Println("Redis connection established successfully")
-	}
+	// 初始化用户仓库（带缓存）
+	userRepo := repository.NewCachedUserRepository(
+		model.NewUserRepository(db),
+		redisClient,
+	)
 
-	// 创建基础用户仓库
-	baseUserRepo := model.NewUserRepository(db)
-
-	// 创建带缓存的用户仓库
-	userRepo := repository.NewCachedUserRepository(baseUserRepo, redisCache)
-
-	// 创建缓存管理器
-	cacheManager := cache.NewCacheManager(redisCache)
-
-	// 创建JWT配置
+	// 初始化JWT配置
 	jwtConfig := middleware.JWTConfig{
 		Secret:     config.JWT.Secret,
 		ExpireTime: time.Duration(config.JWT.ExpireHours) * time.Hour,
@@ -128,44 +114,76 @@ func main() {
 		config.GitHub.RedirectURL,
 	)
 
-	// 创建服务
-	authService := auth.NewAuthService(userRepo, jwtConfig, aliyunConfig, githubOAuth)
+	// 初始化服务
 	userService := user.NewUserService(userRepo)
+	authService := auth.NewAuthService(userRepo, jwtConfig, aliyunConfig, githubOAuth)
+	deviceService := device.NewDeviceService(userRepo)
 
-	// 创建处理器
-	authHandler := auth.NewHandler(authService)
+	// 初始化处理器
 	userHandler := user.NewHandler(userService)
-	cacheHandler := cache.NewHandler(cacheManager)
+	authHandler := auth.NewHandler(authService)
+	deviceHandler := device.NewHandler(deviceService)
+
+	// 初始化设备中间件配置
+	deviceConfig := middleware.DefaultDeviceConfig()
 
 	// 创建路由
 	r := gin.Default()
 
-	// 添加中间件
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery())
+	// 添加设备中间件（全局）
+	r.Use(middleware.DeviceMiddleware(deviceConfig))
 
-	// 健康检查
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status": "ok",
-			"time":   time.Now().Format(time.RFC3339),
-		})
+	// 添加CORS中间件
+	r.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Device-ID, X-Client-ID, X-Platform, Platform")
+		c.Header("Access-Control-Expose-Headers", "Content-Length")
+		c.Header("Access-Control-Allow-Credentials", "true")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
 	})
 
 	// API路由组
 	api := r.Group("/api/v1")
 	{
-		// 认证路由（无需JWT验证）
+		// 用户相关路由
+		userHandler.RegisterRoutes(api)
+
+		// 认证相关路由
 		authHandler.RegisterRoutes(api)
 
-		// 需要JWT验证的路由
-		protected := api.Group("")
-		protected.Use(middleware.JWTMiddleware(jwtConfig))
+		// 设备相关路由
+		deviceHandler.RegisterRoutes(api)
+
+		// 需要JWT认证的路由组
+		authorized := api.Group("/")
+		authorized.Use(middleware.JWTMiddleware(jwtConfig))
 		{
-			userHandler.RegisterRoutes(protected)
-			cacheHandler.RegisterRoutes(protected)
+			// 这里可以添加需要认证的路由
+			authorized.GET("/profile", func(c *gin.Context) {
+				userID, _ := middleware.GetUserIDFromContext(c)
+				c.JSON(http.StatusOK, gin.H{
+					"code":    200,
+					"message": "Profile endpoint",
+					"data":    gin.H{"user_id": userID},
+				})
+			})
 		}
 	}
+
+	// 健康检查端点
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+			"time":   time.Now().Format(time.RFC3339),
+		})
+	})
 
 	// 启动服务器
 	port := config.Server.Port
@@ -251,6 +269,33 @@ func connectDatabase(config *Config) (*sql.DB, error) {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
+	// 创建用户表
+	createTableSQL := `
+		CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			phone VARCHAR(15) UNIQUE,
+			status VARCHAR(20),
+			github_id VARCHAR(100) UNIQUE,
+			email VARCHAR(255) UNIQUE,
+			device_id VARCHAR(255) UNIQUE,
+			platform VARCHAR(20),
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
+		
+		CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+		CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+		CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
+		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+		CREATE INDEX IF NOT EXISTS idx_users_device_id ON users(device_id);
+		CREATE INDEX IF NOT EXISTS idx_users_platform ON users(platform);
+	`
+
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create users table: %w", err)
+	}
+
 	return db, nil
 }
 
@@ -267,30 +312,4 @@ func connectRedis(config *Config) (*cache.RedisCache, error) {
 	}
 
 	return redisCache, nil
-}
-
-// initDatabase 初始化数据库表
-func initDatabase(db *sql.DB) error {
-	query := `
-		CREATE TABLE IF NOT EXISTS users (
-			id SERIAL PRIMARY KEY,
-			phone VARCHAR(20) UNIQUE,
-			password VARCHAR(255),
-			nickname VARCHAR(100) NOT NULL,
-			avatar TEXT,
-			status INTEGER DEFAULT 1,
-			github_id VARCHAR(100) UNIQUE,
-			email VARCHAR(255) UNIQUE,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		);
-		
-		CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
-		CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
-		CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
-		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-	`
-
-	_, err := db.Exec(query)
-	return err
 }

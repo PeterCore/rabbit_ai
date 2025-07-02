@@ -69,7 +69,7 @@ type GitHubLoginRequest struct {
 }
 
 // Login 用户登录（阿里一键登录）
-func (s *AuthService) Login(authCode string) (*LoginResponse, error) {
+func (s *AuthService) Login(authCode, platform string) (*LoginResponse, error) {
 	// 1. 调用阿里云接口获取手机号
 	phone, err := s.getPhoneFromAliyun(authCode)
 	if err != nil {
@@ -85,6 +85,7 @@ func (s *AuthService) Login(authCode string) (*LoginResponse, error) {
 			Nickname: "用户" + phone[len(phone)-4:], // 使用手机号后4位作为默认昵称
 			Avatar:   "",                          // 默认头像
 			Status:   1,                           // 正常状态
+			Platform: platform,                    // 设置平台
 		}
 
 		err = s.userRepo.Create(user)
@@ -131,7 +132,7 @@ func (s *AuthService) PasswordLogin(phone, password string) (*LoginResponse, err
 }
 
 // Register 用户注册
-func (s *AuthService) Register(phone, password, nickname string) (*LoginResponse, error) {
+func (s *AuthService) Register(phone, password, nickname, platform string) (*LoginResponse, error) {
 	// 1. 检查用户是否已存在
 	existingUser, err := s.userRepo.GetByPhone(phone)
 	if err == nil && existingUser != nil {
@@ -142,8 +143,9 @@ func (s *AuthService) Register(phone, password, nickname string) (*LoginResponse
 	user := &model.User{
 		Phone:    phone,
 		Nickname: nickname,
-		Avatar:   "", // 默认头像
-		Status:   1,  // 正常状态
+		Avatar:   "",       // 默认头像
+		Status:   1,        // 正常状态
+		Platform: platform, // 设置平台
 	}
 
 	err = s.userRepo.CreateWithPassword(user, password)

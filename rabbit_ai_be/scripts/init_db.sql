@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
     status INTEGER DEFAULT 1,
     github_id VARCHAR(100) UNIQUE, -- GitHub用户ID
     email VARCHAR(255) UNIQUE, -- 邮箱
+    device_id VARCHAR(255) UNIQUE, -- 设备唯一标识
+    platform VARCHAR(20), -- 终端平台: ios/android/browser
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -23,6 +25,8 @@ CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_device_id ON users(device_id);
+CREATE INDEX IF NOT EXISTS idx_users_platform ON users(platform);
 
 -- 插入测试数据（可选）
 INSERT INTO users (phone, nickname, avatar, status) 

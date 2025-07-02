@@ -2,10 +2,14 @@ package model
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+// ErrUserNotFound 用户未找到错误
+var ErrUserNotFound = errors.New("user not found")
 
 // User 用户模型
 type User struct {
@@ -17,6 +21,8 @@ type User struct {
 	Status    int       `json:"status" db:"status"`       // 1: 正常, 0: 禁用
 	GitHubID  string    `json:"github_id" db:"github_id"` // GitHub用户ID
 	Email     string    `json:"email" db:"email"`         // 邮箱
+	DeviceID  string    `json:"device_id" db:"device_id"` // 设备唯一标识
+	Platform  string    `json:"platform" db:"platform"`   // 终端平台: ios/android/browser
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -28,6 +34,7 @@ type UserRepository interface {
 	GetByPhone(phone string) (*User, error)
 	GetByGitHubID(githubID string) (*User, error)
 	GetByEmail(email string) (*User, error)
+	GetByDeviceID(deviceID string) (*User, error)
 	Update(user *User) error
 	Delete(id int64) error
 	CreateWithPassword(user *User, password string) error
@@ -48,8 +55,8 @@ func NewUserRepository(db *sql.DB) UserRepository {
 // Create 创建用户
 func (r *UserRepositoryImpl) Create(user *User) error {
 	query := `
-		INSERT INTO users (phone, nickname, avatar, status, github_id, email, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO users (phone, nickname, avatar, status, github_id, email, device_id, platform, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id`
 
 	now := time.Now()
@@ -64,6 +71,8 @@ func (r *UserRepositoryImpl) Create(user *User) error {
 		user.Status,
 		user.GitHubID,
 		user.Email,
+		user.DeviceID,
+		user.Platform,
 		user.CreatedAt,
 		user.UpdatedAt,
 	).Scan(&user.ID)
@@ -78,8 +87,8 @@ func (r *UserRepositoryImpl) CreateWithPassword(user *User, password string) err
 	}
 
 	query := `
-		INSERT INTO users (phone, password, nickname, avatar, status, github_id, email, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (phone, password, nickname, avatar, status, github_id, email, device_id, platform, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id`
 
 	now := time.Now()
@@ -95,6 +104,8 @@ func (r *UserRepositoryImpl) CreateWithPassword(user *User, password string) err
 		user.Status,
 		user.GitHubID,
 		user.Email,
+		user.DeviceID,
+		user.Platform,
 		user.CreatedAt,
 		user.UpdatedAt,
 	).Scan(&user.ID)
@@ -104,7 +115,7 @@ func (r *UserRepositoryImpl) CreateWithPassword(user *User, password string) err
 func (r *UserRepositoryImpl) GetByID(id int64) (*User, error) {
 	user := &User{}
 	query := `
-		SELECT id, phone, password, nickname, avatar, status, github_id, email, created_at, updated_at
+		SELECT id, phone, password, nickname, avatar, status, github_id, email, device_id, platform, created_at, updated_at
 		FROM users WHERE id = $1`
 
 	err := r.db.QueryRow(query, id).Scan(
@@ -116,6 +127,8 @@ func (r *UserRepositoryImpl) GetByID(id int64) (*User, error) {
 		&user.Status,
 		&user.GitHubID,
 		&user.Email,
+		&user.DeviceID,
+		&user.Platform,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -131,7 +144,7 @@ func (r *UserRepositoryImpl) GetByID(id int64) (*User, error) {
 func (r *UserRepositoryImpl) GetByPhone(phone string) (*User, error) {
 	user := &User{}
 	query := `
-		SELECT id, phone, password, nickname, avatar, status, github_id, email, created_at, updated_at
+		SELECT id, phone, password, nickname, avatar, status, github_id, email, device_id, platform, created_at, updated_at
 		FROM users WHERE phone = $1`
 
 	err := r.db.QueryRow(query, phone).Scan(
@@ -143,6 +156,8 @@ func (r *UserRepositoryImpl) GetByPhone(phone string) (*User, error) {
 		&user.Status,
 		&user.GitHubID,
 		&user.Email,
+		&user.DeviceID,
+		&user.Platform,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -158,7 +173,7 @@ func (r *UserRepositoryImpl) GetByPhone(phone string) (*User, error) {
 func (r *UserRepositoryImpl) GetByGitHubID(githubID string) (*User, error) {
 	user := &User{}
 	query := `
-		SELECT id, phone, password, nickname, avatar, status, github_id, email, created_at, updated_at
+		SELECT id, phone, password, nickname, avatar, status, github_id, email, device_id, platform, created_at, updated_at
 		FROM users WHERE github_id = $1`
 
 	err := r.db.QueryRow(query, githubID).Scan(
@@ -170,6 +185,8 @@ func (r *UserRepositoryImpl) GetByGitHubID(githubID string) (*User, error) {
 		&user.Status,
 		&user.GitHubID,
 		&user.Email,
+		&user.DeviceID,
+		&user.Platform,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -185,7 +202,7 @@ func (r *UserRepositoryImpl) GetByGitHubID(githubID string) (*User, error) {
 func (r *UserRepositoryImpl) GetByEmail(email string) (*User, error) {
 	user := &User{}
 	query := `
-		SELECT id, phone, password, nickname, avatar, status, github_id, email, created_at, updated_at
+		SELECT id, phone, password, nickname, avatar, status, github_id, email, device_id, platform, created_at, updated_at
 		FROM users WHERE email = $1`
 
 	err := r.db.QueryRow(query, email).Scan(
@@ -197,6 +214,37 @@ func (r *UserRepositoryImpl) GetByEmail(email string) (*User, error) {
 		&user.Status,
 		&user.GitHubID,
 		&user.Email,
+		&user.DeviceID,
+		&user.Platform,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// GetByDeviceID 根据设备ID获取用户
+func (r *UserRepositoryImpl) GetByDeviceID(deviceID string) (*User, error) {
+	user := &User{}
+	query := `
+		SELECT id, phone, password, nickname, avatar, status, github_id, email, device_id, platform, created_at, updated_at
+		FROM users WHERE device_id = $1`
+
+	err := r.db.QueryRow(query, deviceID).Scan(
+		&user.ID,
+		&user.Phone,
+		&user.Password,
+		&user.Nickname,
+		&user.Avatar,
+		&user.Status,
+		&user.GitHubID,
+		&user.Email,
+		&user.DeviceID,
+		&user.Platform,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -233,8 +281,8 @@ func (r *UserRepositoryImpl) VerifyPassword(phone, password string) (*User, erro
 func (r *UserRepositoryImpl) Update(user *User) error {
 	query := `
 		UPDATE users 
-		SET nickname = $1, avatar = $2, status = $3, github_id = $4, email = $5, updated_at = $6
-		WHERE id = $7`
+		SET nickname = $1, avatar = $2, status = $3, github_id = $4, email = $5, device_id = $6, platform = $7, updated_at = $8
+		WHERE id = $9`
 
 	user.UpdatedAt = time.Now()
 
@@ -245,6 +293,8 @@ func (r *UserRepositoryImpl) Update(user *User) error {
 		user.Status,
 		user.GitHubID,
 		user.Email,
+		user.DeviceID,
+		user.Platform,
 		user.UpdatedAt,
 		user.ID,
 	)

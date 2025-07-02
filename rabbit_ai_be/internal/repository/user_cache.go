@@ -107,6 +107,11 @@ func (r *CachedUserRepository) GetByEmail(email string) (*model.User, error) {
 	return r.userRepo.GetByEmail(email)
 }
 
+// GetByDeviceID 根据设备ID获取用户（不缓存，因为设备ID查询较少）
+func (r *CachedUserRepository) GetByDeviceID(deviceID string) (*model.User, error) {
+	return r.userRepo.GetByDeviceID(deviceID)
+}
+
 // Update 更新用户信息（同时更新缓存）
 func (r *CachedUserRepository) Update(user *model.User) error {
 	// 先更新数据库

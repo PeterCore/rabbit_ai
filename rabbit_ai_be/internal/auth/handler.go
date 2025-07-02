@@ -3,6 +3,8 @@ package auth
 import (
 	"net/http"
 
+	"rabbit_ai/internal/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,13 +26,13 @@ func (h *Handler) Login(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "Invalid request parameters: " + err.Error(),
+			"message": "Invalid request body: " + err.Error(),
 		})
 		return
 	}
 
-	// 调用认证服务
-	response, err := h.authService.Login(req.AuthCode)
+	platform, _ := middleware.GetPlatformFromContext(c)
+	response, err := h.authService.Login(req.AuthCode, platform)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
@@ -41,7 +43,7 @@ func (h *Handler) Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    200,
-		"message": "Login successful",
+		"message": "登录成功",
 		"data":    response,
 	})
 }
@@ -80,13 +82,13 @@ func (h *Handler) Register(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "Invalid request parameters: " + err.Error(),
+			"message": "Invalid request body: " + err.Error(),
 		})
 		return
 	}
 
-	// 调用认证服务
-	response, err := h.authService.Register(req.Phone, req.Password, req.Nickname)
+	platform, _ := middleware.GetPlatformFromContext(c)
+	response, err := h.authService.Register(req.Phone, req.Password, req.Nickname, platform)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
@@ -97,7 +99,7 @@ func (h *Handler) Register(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    200,
-		"message": "Registration successful",
+		"message": "注册成功",
 		"data":    response,
 	})
 }
