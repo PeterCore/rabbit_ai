@@ -57,109 +57,112 @@ rabbit_ai/
 └── README.md                    # 项目说明
 ```
 
-## 快速开始
+## 🚀 快速开始
 
-### 1. 环境要求
-
-- Go 1.21+
-- PostgreSQL 12+
-- Redis 6+
-- 阿里云账号（用于一键登录服务）
-- GitHub账号（用于创建OAuth应用）
-
-### 2. 克隆项目
-
+### 1. 克隆项目
 ```bash
-git clone <repository-url>
-cd rabbit_ai
+git clone <your-repo-url>
+cd rabbit_ai_be
 ```
 
-### 3. 安装依赖
-
+### 2. 设置环境变量
 ```bash
-make deps
-# 或者
-go mod tidy
-```
-
-### 4. 配置环境变量
-
-复制环境变量示例文件并修改配置：
-
-```bash
+# 复制环境变量模板
 cp env.example .env
+
+# 编辑.env文件，填入你的配置信息
+vim .env
 ```
 
-编辑 `.env` 文件，配置以下参数：
+### 3. 启动服务
+```bash
+# 方式1：使用快速启动脚本（推荐）
+./scripts/start.sh
 
-```env
-# 数据库配置
+# 方式2：使用Makefile
+make setup-env  # 首次设置环境
+make test-env   # 测试环境配置
+make build      # 构建项目
+make run        # 运行项目
+```
+
+### 4. 验证服务
+```bash
+# 健康检查
+curl http://localhost:8080/health
+
+# 测试MiniMax AI接口
+curl -X POST "http://localhost:8080/api/v1/ai/chat/simple" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "你好"}'
+```
+
+## 🔧 环境配置
+
+### 必需配置项
+
+#### MiniMax AI配置
+```bash
+# MiniMax AI API密钥（必需）
+MINIMAX_API_KEY=your-minimax-api-key
+
+# MiniMax API基础URL（可选，有默认值）
+MINIMAX_BASE_URL=https://api.minimaxi.com/v1
+```
+
+#### 数据库配置
+```bash
 DB_HOST=localhost
 DB_PORT=5432
 DB_USER=postgres
-DB_PASSWORD=your_password
+DB_PASSWORD=password
 DB_NAME=rabbit_ai
 DB_SSLMODE=disable
+```
 
-# Redis 配置
+#### Redis配置
+```bash
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 REDIS_DB=0
+```
 
-# JWT 配置
+#### JWT配置
+```bash
 JWT_SECRET=your-secret-key-here
 JWT_EXPIRE_HOURS=24
+```
 
-# 阿里云配置
+### 可选配置项
+
+#### 阿里云一键登录
+```bash
 ALIYUN_ACCESS_KEY_ID=your-access-key-id
 ALIYUN_ACCESS_KEY_SECRET=your-access-key-secret
 ALIYUN_REGION=cn-hangzhou
 ALIYUN_ONE_CLICK_APP_ID=your-one-click-app-id
+```
 
-# GitHub配置
+#### GitHub OAuth
+```bash
 GITHUB_CLIENT_ID=your-github-client-id
 GITHUB_CLIENT_SECRET=your-github-client-secret
 GITHUB_REDIRECT_URL=http://localhost:8080/api/v1/auth/github/callback
 ```
 
-### 5. 启动服务
-
-#### 使用 Docker Compose（推荐）
+## 📋 可用命令
 
 ```bash
-# 启动所有服务（PostgreSQL + Redis + 应用）
-docker-compose up -d
-
-# 查看服务状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f app
-```
-
-#### 手动启动
-
-```bash
-# 启动 PostgreSQL
-# 根据你的系统安装和启动 PostgreSQL
-
-# 启动 Redis
-redis-server
-
-# 初始化数据库
-make init-db
-
-# 运行应用
-make run
-```
-
-### 6. 验证服务
-
-访问健康检查接口：
-
-```bash
-curl http://localhost:8080/health
+make help        # 查看所有可用命令
+make setup-env   # 设置环境变量文件
+make test-env    # 测试环境变量配置
+make build       # 构建项目
+make run         # 运行项目
+make test        # 运行测试
+make clean       # 清理构建文件
+make docker-build # 构建Docker镜像
+make docker-run  # 运行Docker容器
 ```
 
 ## 缓存功能
@@ -318,3 +321,51 @@ CMD ["./server"]
 ## 许可证
 
 MIT License
+
+## 环境配置
+
+### 1. 复制环境变量模板
+```bash
+cp env.example .env
+```
+
+### 2. 编辑.env文件
+```bash
+# 编辑.env文件，填入你的配置信息
+vim .env
+```
+
+### 3. 主要配置项说明
+
+#### MiniMax AI配置
+```bash
+# MiniMax AI API密钥（必需）
+MINIMAX_API_KEY=your-minimax-api-key
+
+# MiniMax API基础URL（可选，有默认值）
+MINIMAX_BASE_URL=https://api.minimaxi.com/v1
+```
+
+#### 数据库配置
+```bash
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=password
+DB_NAME=rabbit_ai
+DB_SSLMODE=disable
+```
+
+#### Redis配置
+```bash
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+```
+
+#### JWT配置
+```bash
+JWT_SECRET=your-secret-key-here
+JWT_EXPIRE_HOURS=24
+```

@@ -47,7 +47,7 @@ services:
       - "8080:8080"
     environment:
       - SERVER_PORT=8080
-      - SERVER_MODE=release
+      - SERVER_MODE=production
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=postgres
@@ -58,8 +58,10 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=
       - REDIS_DB=0
-      - JWT_SECRET=your-secret-key-here-change-in-production
+      - JWT_SECRET=your-secret-key-here
       - JWT_EXPIRE_HOURS=24
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-https://api.minimaxi.com/v1}
       - ALIYUN_ACCESS_KEY_ID=your-access-key-id
       - ALIYUN_ACCESS_KEY_SECRET=your-access-key-secret
       - ALIYUN_REGION=cn-hangzhou
@@ -67,6 +69,8 @@ services:
       - GITHUB_CLIENT_ID=your-github-client-id
       - GITHUB_CLIENT_SECRET=your-github-client-secret
       - GITHUB_REDIRECT_URL=http://localhost:8080/api/v1/auth/github/callback
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,6 +93,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    volumes:
+      - ./logs:/app/logs
 
 volumes:
   postgres_data:

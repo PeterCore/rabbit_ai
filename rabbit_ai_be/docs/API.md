@@ -505,4 +505,72 @@ curl -X PUT "http://localhost:8080/api/v1/users/1" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{"nickname": "新昵称", "avatar": "新头像URL"}'
+```
+
+## AI聊天API
+
+### 1. 完整聊天接口
+
+**POST** `/ai/chat`
+
+请求体：
+```json
+{
+  "message": "你好，请介绍一下Go语言"
+}
+```
+
+响应：
+```json
+{
+  "code": 200,
+  "message": "Success",
+  "data": {
+    "content": "Go语言是由Google开发的一种静态强类型、编译型语言...",
+    "usage": {
+      "total_tokens": 150,
+      "total_characters": 0,
+      "prompt_tokens": 80,
+      "completion_tokens": 70
+    }
+  }
+}
+```
+
+### 2. 简单聊天接口
+
+**POST** `/ai/chat/simple`
+
+请求体：
+```json
+{
+  "message": "你好"
+}
+```
+
+响应：
+```json
+{
+  "code": 200,
+  "message": "Success",
+  "data": {
+    "content": "你好！有什么我可以帮助你的吗？"
+  }
+}
+```
+
+## 使用示例
+
+### 1. AI聊天示例
+
+```bash
+# 简单聊天
+curl -X POST "http://localhost:8080/api/v1/ai/chat/simple" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "你好"}'
+
+# 完整聊天（包含使用统计）
+curl -X POST "http://localhost:8080/api/v1/ai/chat" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "请介绍一下Go语言的特点"}'
 ``` 

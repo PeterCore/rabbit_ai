@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,7 @@ import (
 	"rabbit_ai/internal/cache"
 	"rabbit_ai/internal/device"
 	"rabbit_ai/internal/middleware"
+	"rabbit_ai/internal/minimax"
 	"rabbit_ai/internal/model"
 	"rabbit_ai/internal/repository"
 	"rabbit_ai/internal/user"
@@ -25,7 +27,7 @@ import (
 // Config 配置结构
 type Config struct {
 	Server struct {
-		Port string `yaml:"port"`
+		Port int    `yaml:"port"`
 		Mode string `yaml:"mode"`
 	} `yaml:"server"`
 	Database struct {
@@ -37,12 +39,10 @@ type Config struct {
 		SSLMode  string `yaml:"sslmode"`
 	} `yaml:"database"`
 	Redis struct {
-		Host         string `yaml:"host"`
-		Port         int    `yaml:"port"`
-		Password     string `yaml:"password"`
-		DB           int    `yaml:"db"`
-		PoolSize     int    `yaml:"pool_size"`
-		MinIdleConns int    `yaml:"min_idle_conns"`
+		Host     string `yaml:"host"`
+		Port     int    `yaml:"port"`
+		Password string `yaml:"password"`
+		DB       int    `yaml:"db"`
 	} `yaml:"redis"`
 	JWT struct {
 		Secret      string `yaml:"secret"`
@@ -59,15 +59,19 @@ type Config struct {
 		ClientSecret string `yaml:"client_secret"`
 		RedirectURL  string `yaml:"redirect_url"`
 	} `yaml:"github"`
+	MiniMax struct {
+		APIKey  string `yaml:"api_key"`
+		BaseURL string `yaml:"base_url"`
+	} `yaml:"minimax"`
 }
 
 func main() {
-	// 加载环境变量
+	// 加载.env文件
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using system environment variables")
+		log.Printf("Warning: .env file not found: %v", err)
 	}
 
-	// 初始化配置
+	// 加载配置
 	config := loadConfig()
 
 	// 设置Gin模式
@@ -119,10 +123,21 @@ func main() {
 	authService := auth.NewAuthService(userRepo, jwtConfig, aliyunConfig, githubOAuth)
 	deviceService := device.NewDeviceService(userRepo)
 
+	// 初始化MiniMax AI服务
+	minimaxConfig := minimax.MiniMaxConfig{
+		APIKey:  config.MiniMax.APIKey,
+		BaseURL: config.MiniMax.BaseURL,
+	}
+	if minimaxConfig.BaseURL == "" {
+		minimaxConfig.BaseURL = "https://api.minimaxi.com/v1"
+	}
+	minimaxService := minimax.NewMiniMaxService(minimaxConfig)
+
 	// 初始化处理器
 	userHandler := user.NewHandler(userService)
 	authHandler := auth.NewHandler(authService)
 	deviceHandler := device.NewHandler(deviceService)
+	minimaxHandler := minimax.NewHandler(minimaxService)
 
 	// 初始化设备中间件配置
 	deviceConfig := middleware.DefaultDeviceConfig()
@@ -161,6 +176,9 @@ func main() {
 		// 设备相关路由
 		deviceHandler.RegisterRoutes(api)
 
+		// AI相关路由
+		minimaxHandler.RegisterRoutes(api)
+
 		// 需要JWT认证的路由组
 		authorized := api.Group("/")
 		authorized.Use(middleware.JWTMiddleware(jwtConfig))
@@ -187,41 +205,58 @@ func main() {
 
 	// 启动服务器
 	port := config.Server.Port
-	if port == "" {
-		port = "8080"
+	if port == 0 {
+		port = 8080
 	}
 
-	log.Printf("Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
+	log.Printf("Server starting on port %d", port)
+	if err := r.Run(":" + fmt.Sprint(port)); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
 
-// loadConfig 加载配置
-func loadConfig() *Config {
-	config := &Config{}
+// loadConfig 从环境变量加载配置
+func loadConfig() Config {
+	var config Config
 
 	// 从环境变量加载配置
-	config.Server.Port = getEnv("SERVER_PORT", "8080")
+	config.Server.Port = 8080 // 默认端口
+	if portStr := getEnv("SERVER_PORT", ""); portStr != "" {
+		if port, err := strconv.Atoi(portStr); err == nil {
+			config.Server.Port = port
+		}
+	}
 	config.Server.Mode = getEnv("SERVER_MODE", "debug")
 
 	config.Database.Host = getEnv("DB_HOST", "localhost")
 	config.Database.Port = 5432
+	if portStr := getEnv("DB_PORT", ""); portStr != "" {
+		if port, err := strconv.Atoi(portStr); err == nil {
+			config.Database.Port = port
+		}
+	}
 	config.Database.User = getEnv("DB_USER", "postgres")
 	config.Database.Password = getEnv("DB_PASSWORD", "password")
 	config.Database.DBName = getEnv("DB_NAME", "rabbit_ai")
 	config.Database.SSLMode = getEnv("DB_SSLMODE", "disable")
 
-	// Redis配置
 	config.Redis.Host = getEnv("REDIS_HOST", "localhost")
 	config.Redis.Port = 6379
+	if portStr := getEnv("REDIS_PORT", ""); portStr != "" {
+		if port, err := strconv.Atoi(portStr); err == nil {
+			config.Redis.Port = port
+		}
+	}
 	config.Redis.Password = getEnv("REDIS_PASSWORD", "")
 	config.Redis.DB = 0
-	config.Redis.PoolSize = 10
-	config.Redis.MinIdleConns = 5
 
 	config.JWT.Secret = getEnv("JWT_SECRET", "your-secret-key-here")
 	config.JWT.ExpireHours = 24
+	if hoursStr := getEnv("JWT_EXPIRE_HOURS", ""); hoursStr != "" {
+		if hours, err := strconv.Atoi(hoursStr); err == nil {
+			config.JWT.ExpireHours = hours
+		}
+	}
 
 	config.Aliyun.AccessKeyID = getEnv("ALIYUN_ACCESS_KEY_ID", "")
 	config.Aliyun.AccessKeySecret = getEnv("ALIYUN_ACCESS_KEY_SECRET", "")
@@ -231,6 +266,10 @@ func loadConfig() *Config {
 	config.GitHub.ClientID = getEnv("GITHUB_CLIENT_ID", "")
 	config.GitHub.ClientSecret = getEnv("GITHUB_CLIENT_SECRET", "")
 	config.GitHub.RedirectURL = getEnv("GITHUB_REDIRECT_URL", "")
+
+	// MiniMax配置从.env文件获取
+	config.MiniMax.APIKey = getEnv("MINIMAX_API_KEY", "")
+	config.MiniMax.BaseURL = getEnv("MINIMAX_BASE_URL", "https://api.minimaxi.com/v1")
 
 	return config
 }
@@ -244,7 +283,7 @@ func getEnv(key, defaultValue string) string {
 }
 
 // connectDatabase 连接数据库
-func connectDatabase(config *Config) (*sql.DB, error) {
+func connectDatabase(config Config) (*sql.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		config.Database.Host,
 		config.Database.Port,
@@ -300,7 +339,7 @@ func connectDatabase(config *Config) (*sql.DB, error) {
 }
 
 // connectRedis 连接Redis
-func connectRedis(config *Config) (*cache.RedisCache, error) {
+func connectRedis(config Config) (*cache.RedisCache, error) {
 	addr := fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port)
 
 	redisCache := cache.NewRedisCache(addr, config.Redis.Password, config.Redis.DB)
