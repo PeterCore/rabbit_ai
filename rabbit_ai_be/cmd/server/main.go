@@ -16,6 +16,7 @@ import (
 
 	"rabbit_ai/internal/auth"
 	"rabbit_ai/internal/cache"
+	"rabbit_ai/internal/conversation"
 	"rabbit_ai/internal/device"
 	"rabbit_ai/internal/middleware"
 	"rabbit_ai/internal/minimax"
@@ -97,6 +98,17 @@ func main() {
 		redisClient,
 	)
 
+	// 初始化对话和消息仓库
+	conversationRepo := model.NewConversationRepository(db)
+	messageRepo := model.NewMessageRepository(db)
+
+	// 初始化对话缓存
+	conversationCache := cache.NewConversationCache(
+		fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
+		config.Redis.Password,
+		config.Redis.DB+1, // 使用不同的数据库避免冲突
+	)
+
 	// 初始化JWT配置
 	jwtConfig := middleware.JWTConfig{
 		Secret:     config.JWT.Secret,
@@ -133,11 +145,21 @@ func main() {
 	}
 	minimaxService := minimax.NewMiniMaxService(minimaxConfig)
 
+	// 初始化对话服务
+	conversationService := conversation.NewService(
+		conversationRepo,
+		messageRepo,
+		userRepo,
+		conversationCache,
+		minimaxService,
+	)
+
 	// 初始化处理器
 	userHandler := user.NewHandler(userService)
 	authHandler := auth.NewHandler(authService)
 	deviceHandler := device.NewHandler(deviceService)
 	minimaxHandler := minimax.NewHandler(minimaxService)
+	conversationHandler := conversation.NewHandler(conversationService)
 
 	// 初始化设备中间件配置
 	deviceConfig := middleware.DefaultDeviceConfig()
@@ -183,6 +205,9 @@ func main() {
 		authorized := api.Group("/")
 		authorized.Use(middleware.JWTMiddleware(jwtConfig))
 		{
+			// 对话相关路由（需要认证）
+			conversationHandler.RegisterRoutes(authorized)
+
 			// 这里可以添加需要认证的路由
 			authorized.GET("/profile", func(c *gin.Context) {
 				userID, _ := middleware.GetUserIDFromContext(c)
@@ -204,15 +229,9 @@ func main() {
 	})
 
 	// 启动服务器
-	port := config.Server.Port
-	if port == 0 {
-		port = 8080
-	}
-
-	log.Printf("Server starting on port %d", port)
-	if err := r.Run(":" + fmt.Sprint(port)); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
+	addr := fmt.Sprintf(":%d", config.Server.Port)
+	log.Printf("Server starting on port %d", config.Server.Port)
+	log.Fatal(r.Run(addr))
 }
 
 // loadConfig 从环境变量加载配置

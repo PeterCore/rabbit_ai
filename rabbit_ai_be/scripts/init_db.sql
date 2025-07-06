@@ -1,5 +1,6 @@
--- 创建数据库
-CREATE DATABASE IF NOT EXISTS rabbit_ai;
+-- 创建数据库（PostgreSQL 语法）
+SELECT 'CREATE DATABASE rabbit_ai'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'rabbit_ai')\gexec
 
 -- 使用数据库
 \c rabbit_ai;
@@ -27,6 +28,39 @@ CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_device_id ON users(device_id);
 CREATE INDEX IF NOT EXISTS idx_users_platform ON users(platform);
+
+-- 创建对话表
+CREATE TABLE IF NOT EXISTS conversations (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    title VARCHAR(255) NOT NULL DEFAULT '新对话',
+    status INTEGER DEFAULT 1, -- 1: 活跃, 0: 已删除
+    message_count INTEGER DEFAULT 0,
+    last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 创建消息表
+CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL,
+    role VARCHAR(20) NOT NULL, -- user/assistant
+    content TEXT NOT NULL,
+    tokens INTEGER DEFAULT 0,
+    model VARCHAR(50) DEFAULT 'glm-4',
+    finish_reason VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status);
+CREATE INDEX IF NOT EXISTS idx_conversations_last_message_at ON conversations(last_message_at);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 
 -- 插入测试数据（可选）
 INSERT INTO users (phone, nickname, avatar, status) 

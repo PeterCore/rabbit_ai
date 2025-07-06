@@ -1,371 +1,355 @@
-# Rabbit AI 登录注册系统
+# Rabbit AI Backend
 
-一个基于 Golang + Gin 框架的 AI 应用登录注册系统，支持阿里一键登录、JWT 认证、PostgreSQL 数据库和 Redis 缓存。
+一个基于 Go 和 Gin 框架的现代化后端服务，提供用户认证、设备管理、缓存管理和 AI 聊天等功能。
 
 ## 功能特性
 
-- 🔐 **阿里一键登录**: 集成阿里云一键登录服务，用户可通过手机号快速登录
-- 🐙 **GitHub登录**: 集成GitHub OAuth，用户可通过GitHub账号快速登录
-- 🛡️ **JWT 认证**: 使用 JWT 进行用户身份验证和授权
-- 👤 **用户管理**: 完整的用户 CRUD 操作
-- 🗄️ **PostgreSQL**: 使用 PostgreSQL 作为主数据库
-- ⚡ **Redis 缓存**: 使用 Redis 缓存用户信息，提升查询性能
-- 🏗️ **分层架构**: 清晰的分层架构设计，易于维护和扩展
-- 📚 **完整文档**: 提供详细的 API 文档和使用说明
+- 🔐 **用户认证**: JWT 认证、GitHub OAuth 登录
+- 📱 **设备管理**: 设备标识、平台检测、设备绑定
+- 🚀 **Redis 缓存**: 高性能缓存、用户信息缓存
+- 🤖 **AI 聊天**: MiniMax AI 集成、流式响应、参数控制
+- 🛡️ **中间件**: JWT 验证、设备识别、CORS 支持
+- 📊 **监控**: 缓存统计、使用情况监控
 
-## 技术栈
+## MiniMax AI 功能
 
-- **后端框架**: Gin
-- **认证**: JWT (github.com/dgrijalva/jwt-go)
-- **数据库**: PostgreSQL
-- **缓存**: Redis (github.com/redis/go-redis/v9)
-- **配置管理**: 环境变量 + godotenv
-- **API 文档**: Markdown 格式
+### 支持的参数
 
-## 项目结构
+- **temperature**: 温度参数，控制随机性 (0.0-2.0)
+- **max_tokens**: 最大生成token数
+- **top_p**: 核采样参数 (0.0-1.0)
+- **stream**: 流式响应支持
+- **tool_choices**: 工具选择
+- **stop**: 停止词列表
+- **user**: 用户标识
+- **repetition_penalty**: 重复惩罚参数
+- **presence_penalty**: 存在惩罚参数
+- **frequency_penalty**: 频率惩罚参数
 
-```
-rabbit_ai/
-├── cmd/
-│   └── server/
-│       └── main.go              # 主程序入口
-├── internal/
-│   ├── auth/
-│   │   ├── handler.go           # 认证处理器
-│   │   └── service.go           # 认证服务
-│   ├── user/
-│   │   ├── handler.go           # 用户处理器
-│   │   └── service.go           # 用户服务
-│   ├── middleware/
-│   │   └── jwt.go               # JWT 中间件
-│   ├── model/
-│   │   └── user.go              # 用户模型
-│   ├── cache/
-│   │   ├── redis.go             # Redis 缓存服务
-│   │   └── redis_test.go        # Redis 缓存测试
-│   └── repository/
-│       └── user_cache.go        # 带缓存的用户仓库
-├── config/
-│   └── config.yaml              # 配置文件
-├── scripts/
-│   └── init_db.sql              # 数据库初始化脚本
-├── docs/
-│   └── API.md                   # API 文档
-├── go.mod                       # Go 模块文件
-├── Makefile                     # 构建脚本
-├── env.example                  # 环境变量示例
-└── README.md                    # 项目说明
-```
+### 响应类型
 
-## 🚀 快速开始
+- **普通响应**: 完整的AI回复和使用统计
+- **流式响应**: Server-Sent Events (SSE) 实时流式输出
 
-### 1. 克隆项目
+## 快速开始
+
+### 1. 环境要求
+
+- Go 1.21+
+- PostgreSQL 12+
+- Redis 6+
+- Docker (可选)
+
+### 2. 安装依赖
+
 ```bash
-git clone <your-repo-url>
-cd rabbit_ai_be
+go mod download
 ```
 
-### 2. 设置环境变量
+### 3. 环境配置
+
+复制环境变量文件并配置：
+
 ```bash
-# 复制环境变量模板
 cp env.example .env
-
-# 编辑.env文件，填入你的配置信息
-vim .env
 ```
 
-### 3. 启动服务
+编辑 `.env` 文件：
+
 ```bash
-# 方式1：使用快速启动脚本（推荐）
-./scripts/start.sh
-
-# 方式2：使用Makefile
-make setup-env  # 首次设置环境
-make test-env   # 测试环境配置
-make build      # 构建项目
-make run        # 运行项目
-```
-
-### 4. 验证服务
-```bash
-# 健康检查
-curl http://localhost:8080/health
-
-# 测试MiniMax AI接口
-curl -X POST "http://localhost:8080/api/v1/ai/chat/simple" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "你好"}'
-```
-
-## 🔧 环境配置
-
-### 必需配置项
-
-#### MiniMax AI配置
-```bash
-# MiniMax AI API密钥（必需）
-MINIMAX_API_KEY=your-minimax-api-key
-
-# MiniMax API基础URL（可选，有默认值）
-MINIMAX_BASE_URL=https://api.minimaxi.com/v1
-```
-
-#### 数据库配置
-```bash
+# 数据库配置
 DB_HOST=localhost
 DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=password
 DB_NAME=rabbit_ai
-DB_SSLMODE=disable
-```
 
-#### Redis配置
-```bash
+# Redis配置
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 REDIS_DB=0
-```
 
-#### JWT配置
-```bash
-JWT_SECRET=your-secret-key-here
-JWT_EXPIRE_HOURS=24
-```
+# JWT配置
+JWT_SECRET=your-jwt-secret-key
 
-### 可选配置项
-
-#### 阿里云一键登录
-```bash
-ALIYUN_ACCESS_KEY_ID=your-access-key-id
-ALIYUN_ACCESS_KEY_SECRET=your-access-key-secret
-ALIYUN_REGION=cn-hangzhou
-ALIYUN_ONE_CLICK_APP_ID=your-one-click-app-id
-```
-
-#### GitHub OAuth
-```bash
+# GitHub OAuth配置
 GITHUB_CLIENT_ID=your-github-client-id
 GITHUB_CLIENT_SECRET=your-github-client-secret
-GITHUB_REDIRECT_URL=http://localhost:8080/api/v1/auth/github/callback
+
+# MiniMax AI配置
+MINIMAX_API_KEY=your-minimax-api-key
+MINIMAX_BASE_URL=https://api.minimaxi.com/v1
+
+# 服务器配置
+PORT=8080
 ```
 
-## 📋 可用命令
+### 4. 启动服务
+
+#### 使用 Docker Compose (推荐)
 
 ```bash
-make help        # 查看所有可用命令
-make setup-env   # 设置环境变量文件
-make test-env    # 测试环境变量配置
-make build       # 构建项目
-make run         # 运行项目
-make test        # 运行测试
-make clean       # 清理构建文件
-make docker-build # 构建Docker镜像
-make docker-run  # 运行Docker容器
+# 启动所有服务
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
 ```
 
-## 缓存功能
-
-### Redis 缓存特性
-
-- **用户信息缓存**: 用户信息缓存30分钟，提升查询性能
-- **缓存策略**: 采用 Cache-Aside 模式，先查缓存，缓存未命中则查数据库
-- **数据同步**: 确保缓存与数据库数据一致性
-- **自动失效**: 用户信息更新时自动使缓存失效
-
-### 缓存操作
-
-- **读取**: 优先从 Redis 缓存获取，缓存未命中则从数据库获取并缓存
-- **写入**: 先写入数据库，再更新缓存
-- **更新**: 先更新数据库，再更新缓存
-- **删除**: 先删除数据库记录，再删除缓存
-- **密码更新**: 密码更新时使缓存失效（安全考虑）
-
-## API 使用
-
-### 用户登录
+#### 手动启动
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
+# 启动数据库和Redis
+make db-start
+make redis-start
+
+# 运行项目
+make run
+```
+
+### 5. 验证服务
+
+```bash
+# 健康检查
+curl http://localhost:8080/api/v1/health
+
+# 测试环境变量
+go run scripts/test_env.go
+```
+
+## API 使用示例
+
+### MiniMax AI 聊天
+
+#### 简单聊天
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/ai/chat/simple" \
   -H "Content-Type: application/json" \
-  -d '{"auth_code": "your_auth_code_here"}'
+  -d '{
+    "message": "你好，请介绍一下自己",
+    "temperature": 0.7,
+    "max_tokens": 2048
+  }'
 ```
 
-### 获取用户信息
+#### 完整聊天（支持流式）
 
 ```bash
-curl -X GET http://localhost:8080/api/v1/users/profile \
-  -H "Authorization: Bearer your_token_here"
-```
-
-### 更新用户信息
-
-```bash
-curl -X PUT http://localhost:8080/api/v1/users/profile \
-  -H "Authorization: Bearer your_token_here" \
+curl -X POST "http://localhost:8080/api/v1/ai/chat" \
   -H "Content-Type: application/json" \
-  -d '{"nickname": "新昵称", "avatar": "https://example.com/avatar.jpg"}'
+  -d '{
+    "message": "写一首关于春天的诗",
+    "temperature": 0.8,
+    "max_tokens": 500,
+    "top_p": 0.9,
+    "stream": false,
+    "stop": ["END", "STOP"],
+    "user": "poet"
+  }'
 ```
 
-详细的 API 文档请参考 [docs/API.md](docs/API.md)。
-
-## 开发指南
-
-### 代码格式化
+#### 流式聊天
 
 ```bash
-make fmt
+curl -X POST "http://localhost:8080/api/v1/ai/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "请写一个关于人工智能的短文",
+    "stream": true,
+    "temperature": 0.7,
+    "max_tokens": 300
+  }'
 ```
 
-### 代码检查
+### 用户认证
 
 ```bash
-make lint
+# 用户注册
+curl -X POST "http://localhost:8080/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "password": "password123",
+    "email": "test@example.com"
+  }'
+
+# 用户登录
+curl -X POST "http://localhost:8080/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "password": "password123"
+  }'
 ```
 
-### 运行测试
+### 设备管理
 
 ```bash
-# 运行所有测试
+# 绑定设备
+curl -X POST "http://localhost:8080/api/v1/device/bind" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "unique-device-identifier",
+    "platform": "iOS"
+  }'
+```
+
+## 开发
+
+### 项目结构
+
+```
+rabbit_ai_be/
+├── cmd/server/          # 主程序入口
+├── internal/            # 内部包
+│   ├── auth/           # 认证相关
+│   ├── cache/          # 缓存管理
+│   ├── device/         # 设备管理
+│   ├── minimax/        # MiniMax AI 集成
+│   ├── model/          # 数据模型
+│   ├── repository/     # 数据访问层
+│   └── user/           # 用户管理
+├── config/             # 配置文件
+├── docs/               # 文档
+├── scripts/            # 脚本文件
+└── examples/           # 使用示例
+```
+
+### 常用命令
+
+```bash
+# 运行测试
 make test
 
-# 运行缓存测试（需要 Redis 运行）
-go test ./internal/cache/
-```
+# 构建项目
+make build
 
-### 热重载开发
+# 运行项目
+make run
 
-```bash
-# 安装 air
-make install-air
+# 清理构建文件
+make clean
 
-# 启动热重载
+# 格式化代码
+make fmt
+
+# 代码检查
+make lint
+
+# 数据库迁移
+make db-migrate
+
+# 启动开发环境
 make dev
 ```
 
-## 部署
-
-### 构建生产版本
+### 测试
 
 ```bash
-make build
-```
+# 运行所有测试
+go test ./...
 
-### Docker 部署
+# 运行特定包的测试
+go test ./internal/minimax/...
 
-```dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go mod download
-RUN go build -o server cmd/server/main.go
+# 运行测试并显示覆盖率
+go test -cover ./...
 
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-COPY --from=builder /app/server .
-EXPOSE 8080
-CMD ["./server"]
+# 运行基准测试
+go test -bench=. ./...
 ```
 
 ## 配置说明
 
-### 数据库配置
+### 环境变量
 
-- `DB_HOST`: 数据库主机地址
-- `DB_PORT`: 数据库端口
-- `DB_USER`: 数据库用户名
-- `DB_PASSWORD`: 数据库密码
-- `DB_NAME`: 数据库名称
-- `DB_SSLMODE`: SSL 模式
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `DB_HOST` | 数据库主机 | localhost |
+| `DB_PORT` | 数据库端口 | 5432 |
+| `DB_USER` | 数据库用户 | postgres |
+| `DB_PASSWORD` | 数据库密码 | - |
+| `DB_NAME` | 数据库名称 | rabbit_ai |
+| `REDIS_HOST` | Redis主机 | localhost |
+| `REDIS_PORT` | Redis端口 | 6379 |
+| `REDIS_PASSWORD` | Redis密码 | - |
+| `REDIS_DB` | Redis数据库 | 0 |
+| `JWT_SECRET` | JWT密钥 | - |
+| `GITHUB_CLIENT_ID` | GitHub OAuth客户端ID | - |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth客户端密钥 | - |
+| `MINIMAX_API_KEY` | MiniMax API密钥 | - |
+| `MINIMAX_BASE_URL` | MiniMax API基础URL | https://api.minimaxi.com/v1 |
+| `PORT` | 服务器端口 | 8080 |
 
-### Redis 配置
+### MiniMax AI 参数
 
-- `REDIS_HOST`: Redis 主机地址
-- `REDIS_PORT`: Redis 端口
-- `REDIS_PASSWORD`: Redis 密码（可选）
-- `REDIS_DB`: Redis 数据库编号
+| 参数 | 类型 | 范围 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `temperature` | float64 | 0.0-2.0 | 0.7 | 控制输出的随机性 |
+| `max_tokens` | int | > 0 | 2048 | 最大生成token数 |
+| `top_p` | float64 | 0.0-1.0 | 0.9 | 核采样参数 |
+| `stream` | bool | - | false | 是否启用流式响应 |
+| `tool_choices` | array | - | - | 工具选择列表 |
+| `stop` | array | - | - | 停止词列表 |
+| `user` | string | - | - | 用户标识 |
+| `repetition_penalty` | float64 | > 0 | - | 重复惩罚参数 |
+| `presence_penalty` | float64 | - | - | 存在惩罚参数 |
+| `frequency_penalty` | float64 | - | - | 频率惩罚参数 |
 
-### JWT 配置
+## 部署
 
-- `JWT_SECRET`: JWT 签名密钥
-- `JWT_EXPIRE_HOURS`: Token 过期时间（小时）
+### Docker 部署
 
-### 阿里云配置
+```bash
+# 构建镜像
+docker build -t rabbit-ai-backend .
 
-- `ALIYUN_ACCESS_KEY_ID`: 阿里云 Access Key ID
-- `ALIYUN_ACCESS_KEY_SECRET`: 阿里云 Access Key Secret
-- `ALIYUN_REGION`: 阿里云地域
-- `ALIYUN_ONE_CLICK_APP_ID`: 一键登录应用 ID
+# 运行容器
+docker run -d \
+  --name rabbit-ai-backend \
+  -p 8080:8080 \
+  --env-file .env \
+  rabbit-ai-backend
+```
 
-### GitHub配置
+### 生产环境
 
-- `GITHUB_CLIENT_ID`: GitHub Client ID
-- `GITHUB_CLIENT_SECRET`: GitHub Client Secret
-- `GITHUB_REDIRECT_URL`: GitHub Redirect URL
-
-## 注意事项
-
-1. **阿里云配置**: 需要先在阿里云控制台开通一键登录服务并获取相关配置
-2. **数据库安全**: 生产环境中请使用强密码和 SSL 连接
-3. **Redis 安全**: 生产环境中请设置 Redis 密码和访问控制
-4. **JWT 密钥**: 生产环境中请使用足够复杂的密钥
-5. **环境变量**: 敏感信息请通过环境变量配置，不要硬编码
-6. **缓存一致性**: 确保缓存与数据库的数据一致性，避免数据不一致问题
+1. 配置生产环境变量
+2. 使用反向代理 (Nginx)
+3. 配置 SSL 证书
+4. 设置监控和日志
+5. 配置数据库备份
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request！
+1. Fork 项目
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开 Pull Request
 
 ## 许可证
 
-MIT License
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
-## 环境配置
+## 支持
 
-### 1. 复制环境变量模板
-```bash
-cp env.example .env
-```
+如果您遇到问题或有建议，请：
 
-### 2. 编辑.env文件
-```bash
-# 编辑.env文件，填入你的配置信息
-vim .env
-```
+1. 查看 [API 文档](docs/API.md)
+2. 检查 [GitHub Issues](https://github.com/your-repo/rabbit_ai_be/issues)
+3. 创建新的 Issue 或 Pull Request
 
-### 3. 主要配置项说明
+## 更新日志
 
-#### MiniMax AI配置
-```bash
-# MiniMax AI API密钥（必需）
-MINIMAX_API_KEY=your-minimax-api-key
-
-# MiniMax API基础URL（可选，有默认值）
-MINIMAX_BASE_URL=https://api.minimaxi.com/v1
-```
-
-#### 数据库配置
-```bash
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=password
-DB_NAME=rabbit_ai
-DB_SSLMODE=disable
-```
-
-#### Redis配置
-```bash
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
-```
-
-#### JWT配置
-```bash
-JWT_SECRET=your-secret-key-here
-JWT_EXPIRE_HOURS=24
-```
+### v1.0.0
+- 初始版本发布
+- 用户认证和授权
+- 设备管理功能
+- Redis 缓存集成
+- MiniMax AI 聊天功能
+- GitHub OAuth 登录
+- 完整的 API 文档

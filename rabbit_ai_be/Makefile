@@ -69,7 +69,7 @@ dev:
 
 # 安装air（热重载工具）
 install-air:
-	go install github.com/cosmtrek/air@latest
+	go install github.com/cosmtrek/air@latest 
 
 # 构建Docker镜像
 docker-build:

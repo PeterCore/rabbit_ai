@@ -1,14 +1,45 @@
 version: "3.8"
 
 services:
-  # PostgreSQL 数据库
+  app:
+    build: .
+    container_name: rabbit_ai_be_app
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=rabbit_ai
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-secret-key
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID}
+    volumes:
+      - ./config:/app/config
+    networks:
+      - rabbit_ai_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   postgres:
     image: postgres:15-alpine
-    container_name: rabbit_ai_postgres
+    container_name: rabbit_ai_be_postgres
     environment:
-      POSTGRES_DB: rabbit_ai
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rabbit_ai
     ports:
       - "5432:5432"
     volumes:
@@ -22,10 +53,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis 缓存
   redis:
     image: redis:7-alpine
-    container_name: rabbit_ai_redis
+    container_name: rabbit_ai_be_redis
     ports:
       - "6379:6379"
     volumes:
@@ -37,64 +67,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: redis-server --appendonly yes
-
-  # Rabbit AI 应用
-  app:
-    build: .
-    container_name: rabbit_ai_app
-    ports:
-      - "8080:8080"
-    environment:
-      - SERVER_PORT=8080
-      - SERVER_MODE=production
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=rabbit_ai
-      - DB_SSLMODE=disable
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=
-      - REDIS_DB=0
-      - JWT_SECRET=your-secret-key-here
-      - JWT_EXPIRE_HOURS=24
-      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
-      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-https://api.minimaxi.com/v1}
-      - ALIYUN_ACCESS_KEY_ID=your-access-key-id
-      - ALIYUN_ACCESS_KEY_SECRET=your-access-key-secret
-      - ALIYUN_REGION=cn-hangzhou
-      - ALIYUN_ONE_CLICK_APP_ID=your-one-click-app-id
-      - GITHUB_CLIENT_ID=your-github-client-id
-      - GITHUB_CLIENT_SECRET=your-github-client-secret
-      - GITHUB_REDIRECT_URL=http://localhost:8080/api/v1/auth/github/callback
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - rabbit_ai_network
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8080/health",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    volumes:
-      - ./logs:/app/logs
 
 volumes:
   postgres_data:
